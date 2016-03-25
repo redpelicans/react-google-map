@@ -2,7 +2,7 @@
   "presets": ["es2015", "stage-0", "react"],
   "env": {
     "development": {
-    "plugins": [["react-transform", {
+    "plugins": [["transform-decorators-legacy"], ["react-transform", {
        "transforms": [{
          "transform": "react-transform-hmr",
          // if you use React Native, pass "react-native" instead:
