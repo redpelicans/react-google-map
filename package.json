@@ -45,7 +45,8 @@
     "redux": "^3.1.6",
     "redux-subactions": "github:guillaumearm/redux-subactions#0c69129345f3f8421c06ca797c0490cb0a746a9f",
     "redux-thunk": "^1.0.3",
-    "reselect": "^2.0.3"
+    "reselect": "^2.0.3",
+    "turf": "^2.0.2"
   },
   "devDependencies": {
     "autoprefixer": "^6.0.3",
