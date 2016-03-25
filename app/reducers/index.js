@@ -1,8 +1,5 @@
 import { combineReducers } from 'redux'
 
-//const undefinedLatLng = { lat: undefined, lng: undefined }
-//const initialBounds = { nw: undefinedLatLng, se: undefinedLatLng }
-
 const initialPosition = {
   bounds: undefined,
   marginBounds: undefined,
@@ -18,6 +15,14 @@ const positionReducer = (state = initialPosition, action) => {
   }
 }
 
+const mapReducer = (state = null, action) => {
+  switch (action.type) {
+    case 'UPDATE_MAP': return action.map
+    default:           return state
+  }
+}
+
 export default combineReducers({
   position: positionReducer,
+  map: mapReducer,
 })

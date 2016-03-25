@@ -15,9 +15,8 @@ class Shape {}
 @mongobless({collection: 'steps'})
 class Step {}
 
-
+/******************** Helpers *************************************************/
 function geojson(shape, options = {}) {
-
     if(!shape || !shape._id || !shape.geometry || !shape.geometry.type || !shape.geometry.coordinates)
         return {};
 
@@ -97,7 +96,7 @@ function geojsonList(shapes, bbox = null, full = false) {
     follow('geojson ready');
     return featureCollection;
 }
-
+/******************************************************************************/
 
 
 export function init(app) {
