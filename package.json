@@ -1,7 +1,7 @@
 {
-  "name": "test-react-google-map",
-  "version": "0.0.1",
-  "description": "test react-google-map component",
+  "name": "react-google-map",
+  "version": "0.1.0",
+  "description": "react-google-map component and streaming polygons",
   "main": "server.js",
   "repository": {
     "type": "git",
@@ -9,9 +9,8 @@
   },
   "keywords": [
     "google map",
-    "express",
-    "webpack",
-    "node"
+    "streaming polygons",
+    "lazy loading"
   ],
   "author": "Guillaume ARM <guillaume.arm@redpelicans.com>",
   "license": "MIT",
