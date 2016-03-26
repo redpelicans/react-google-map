@@ -1,4 +1,5 @@
 import _ from 'lodash'
+import R from 'ramda'
 import React, { Component } from 'react'
 import { createStore } from 'redux'
 import { connect } from 'react-redux'
@@ -78,24 +79,42 @@ const poly2 = {
 const getPolygons = shapes => shapes.features.filter(x => x.geometry.type === "Polygon")
 const getPoints = shapes => shapes.features.filter(x => x.geometry.type === "Point")
 
+/*
 const boundsToString = b => {
   return b.nw.lng + "," + b.nw.lat + ";" + b.se.lng + "," + b.se.lat
 }
+*/
+
+const rectangleToString = rect => {
+  return _.reduce(rect.geometry.coordinates[0], (acc, p) => {
+    return acc + p[0] + "," + p[1] + ";"
+  }, "")
+}
+
+const boundsToRectangle = b => {
+  return turf.envelope(turf.linestring([
+    [b.nw.lng, b.nw.lat],
+    [b.se.lng, b.se.lat],
+  ]))
+}
+
+const boundsToString = R.compose (R.dropLast(1), rectangleToString, boundsToRectangle)
 
 const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => bounds => {
   return baseUrl + "/api/projects/" + projectId
           + "/shapes/geojson?categories=" + categories
-          + "&bounds=" + boundsToString(bounds)
+          + "&polyBounds=" + boundsToString(bounds)
           + "&method=" + method
           + "&geoUse=" + geoUse
 })(params.query)
 
 const fetchNewShapes = (map, dispatch, position, currentFeatures) => {
-  if (!position.bounds || !map) return
+  if (!position.marginBounds || !map) return
   console.log("Loading GeoJSON...")
   fetch(buildUrl(position.marginBounds))
   .then(res => res.json())
   .then(collection => {
+    console.log(collection.features.length + " features loaded.");
     const filteredCollection = {...collection, features: getPolygons(collection)}
     dispatch(updateFeatures(currentFeatures, filteredCollection, map))
     console.log("Loaded.")
@@ -123,6 +142,8 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
         zoom={position.zoom}
         center={position.center}
         onChange={position => {
+          console.log(JSON.stringify(boundsToRectangle(position.marginBounds)))
+
           dispatch(updatePosition(position))
           fetchNewShapes(map, dispatch, position, props.features)
         }}
