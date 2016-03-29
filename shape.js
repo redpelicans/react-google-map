@@ -160,12 +160,27 @@ export function init(app) {
         //if(geoQuery) stdQuery.$query.$and.push(geoQuery);
         _.extend(stdQuery, geoQuery)
 
+/*
         Shape.findAll(stdQuery, fieldsLimit , (err, shapes) => {
             if(err) return cb(err);
             if(!shapes) return cb(new HTTPError(404, 'No Shape found'));
             follow('Got the Shapes with normal query method');
             return cb(null, shapes, project.bbox);
         });
+  */
+
+
+        let shapes = [];
+        let cursor = Shape.collection.find(stdQuery).project({ _id: 1, geometry: 1, geoIndex: 1, categories: 1, labels: 1 });
+        //let cursor = Shape.collection.find(stdQuery.$query).project(fieldsLimit);
+        cursor.on('data', shape => {
+          if(!shapes.length) follow('Got the first shapes')
+          shapes.push(shape)
+        })
+        cursor.on('end', () => {
+          follow('Got the Shapes with normal query method')
+          return cb(null, shapes, project.bbox)
+        })
 
       }
 
