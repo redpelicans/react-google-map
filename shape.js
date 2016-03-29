@@ -15,8 +15,18 @@ class Shape {}
 @mongobless({collection: 'steps'})
 class Step {}
 
-/******************** Helpers *************************************************/
-function geojson(shape, options = {}) {
+/******************** Helper *************************************************/
+function geojson(shape, full = false) {
+  let options = {
+    properties: full,
+    categories: true,
+    importId: full,
+    informations: full,
+    labels: true,
+    icons: true,
+    bbox: full
+  }
+
     if(!shape || !shape._id || !shape.geometry || !shape.geometry.type || !shape.geometry.coordinates)
         return {};
 
@@ -59,43 +69,10 @@ function geojson(shape, options = {}) {
             if(positions[0] != positions[positions.length-1]) positions.push(positions[0]);
         }
     }
-
-    if((!options.bbox || options.bbox === true) && shape.bbox) {
-      feature.bbox = shapeHelpers.condensedBbox(shape.bbox);
-    }
-
     feature.properties.id = shape._id;
     return feature;
 }
 
-function geojsonList(shapes, bbox = null, full = false) {
-  follow('in geojsonList');
-    //shapes = shapes.slice(0, 1500);
-
-    let geojsonOptions = {
-        properties: false || full,
-        categories: true || full,
-        importId: false || full,
-        informations: false || full,
-        labels: true || full,
-        icons: true || full,
-        bbox: false || full
-    }
-
-    let featureCollection = {
-        type: 'FeatureCollection',
-        features: _.remove(_.map(shapes, (shape) => {return geojson(shape, geojsonOptions);}), i => Object.keys(i).length !== 0)
-    }
-
-    /*
-    if(bbox) {
-      featureCollection.bbox = shapeHelpers.condensedBbox(bbox);
-    }
-    */
-
-    follow('geojson ready');
-    return featureCollection;
-}
 /******************************************************************************/
 
 
@@ -172,7 +149,6 @@ export function init(app) {
 
         let shapes = [];
         let cursor = Shape.collection.find(stdQuery).project({ _id: 1, geometry: 1, geoIndex: 1, categories: 1, labels: 1 });
-        //let cursor = Shape.collection.find(stdQuery.$query).project(fieldsLimit);
         cursor.on('data', shape => {
           if(!shapes.length) follow('Got the first shapes')
           shapes.push(shape)
@@ -310,9 +286,9 @@ export function init(app) {
       getShapesFromReq(req, (err, shapes, bbox) => {
           if(err) return next(err);
           t0 = new Date()
-          const xx = JSON.stringify(geojsonList(shapes, bbox, full))
+          //const xx = JSON.stringify(geojsonList(shapes, bbox, full))
           //res.json(out.geojsonList(shapes, bbox, full));
-          res.send(xx)
+          res.send(JSON.stringify(_.map(shapes, (shape) => geojson(shape, full))))
       });
   }
 }

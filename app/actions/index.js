@@ -13,10 +13,20 @@ export const updateMap = map => {
   return { type: UPDATE_MAP, map }
 }
 
+/*
 export const updateFeatures = (currentFeatures, collection, map) => {
   const diff = _.differenceBy(collection.features, currentFeatures, 'properties.id')
   map.data.addGeoJson({...collection, features: diff})
   return { type: UPDATE_FEATURES, features: diff }
+}
+*/
+
+export const updateFeatures = (features, feature, map) => {
+  if (!features[feature.properties.id]) {
+    map.data.addGeoJson(feature)
+    return { type: UPDATE_FEATURES, feature }
+  }
+  return { type: 'FEATURE_ALREADY_ADDED' }
 }
 
 export const updateDisplayMask = (newMask) => {

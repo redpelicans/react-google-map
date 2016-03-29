@@ -8,7 +8,7 @@ const initialPosition = {
   center: { lat: 46.2096548794286, lng: 7.40106313190809 },
   //center: { lat: 48.88, lng: 2.34 }, // Paris
   size: undefined,
-  zoom: 19,
+  zoom: 18,
 }
 
 const positionReducer = (state = initialPosition, action) => {
@@ -27,9 +27,8 @@ const mapReducer = (state = null, action) => {
 
 const featuresReducer = (state = {} , action) => {
   switch (action.type) {
-    case 'UPDATE_FEATURES': return _.isEmpty(state)
-                                     ? action.features
-                                     : _.union(action.features, state)
+    case 'UPDATE_FEATURES':
+      return { ...state, [action.feature.properties.id]: action.feature }
     default:                return state
   }
 }

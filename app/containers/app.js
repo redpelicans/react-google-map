@@ -108,8 +108,8 @@ const poly3 = {
       }
 }
 
-const getPolygons = shapes => shapes.features.filter(x => x.geometry.type === "Polygon")
-const getPoints = shapes => shapes.features.filter(x => x.geometry.type === "Point")
+const getPolygons = features => features.filter(x => x.geometry.type === "Polygon")
+const getPoints = features => features.filter(x => x.geometry.type === "Point")
 
 /*
 const boundsToString = b => {
@@ -138,7 +138,7 @@ const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => screen
           + "&geoUse=" + geoUse
 })(params.query)
 
-const fetchNewShapes = (map, dispatch, position, currentFeatures, displayMask) => {
+const fetchNewShapes = (map, position, currentFeatures, displayMask) => dispatch => {
   if (!position.marginBounds || !map) return
 
   const screenRect = boundsToRectangle(position.marginBounds)
@@ -153,10 +153,14 @@ const fetchNewShapes = (map, dispatch, position, currentFeatures, displayMask) =
     const url = buildUrl(coordinatesToString((coords.length === 1) ? coords[0] : coords))
     fetch(url)
       .then(res => res.json())
-      .then(collection => {
-        console.log(collection.features.length + " features loaded.");
-        const filteredCollection = {...collection, features: getPolygons(collection)}
-        dispatch(updateFeatures(currentFeatures, filteredCollection, map))
+      .then(features => {
+        const filteredFeatures = getPolygons(features)
+        console.log(filteredFeatures.length + " features loaded.");
+        filteredFeatures.forEach((feature, i) => {
+          setTimeout(() => {
+            dispatch(updateFeatures(currentFeatures, feature, map))
+          }, i * 10)
+        })
         console.log("Loaded.")
       })
       .catch(err => {
@@ -167,6 +171,7 @@ const fetchNewShapes = (map, dispatch, position, currentFeatures, displayMask) =
 }
 
 export default connect (MainAppSelector) (({dispatch, position, map, ...props}) => {
+  //console.log(Object.keys(props.features).length)
   return (
     <div style={{width: "100vw", height: "100vw"}}>
       <GoogleMap
@@ -176,7 +181,7 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
 
         onGoogleApiLoaded={({map, maps}) => {
           dispatch(updateMap(map))
-          fetchNewShapes(map, dispatch, position, props.features, props.displayMask)
+          dispatch(fetchNewShapes(map, position, props.features, props.displayMask))
         }}
         yesIWantToUseGoogleMapApiInternals
         zoom={position.zoom}
@@ -184,7 +189,7 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
         onChange={position => {
 
           dispatch(updatePosition(position))
-          fetchNewShapes(map, dispatch, position, props.features, props.displayMask)
+          dispatch(fetchNewShapes(map, position, props.features, props.displayMask))
         }}
       >
       </GoogleMap>
