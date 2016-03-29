@@ -7,37 +7,37 @@ import { connect } from 'react-redux'
 import params from '../../params'
 
 import MainAppSelector from '../selectors'
-import { updatePosition, updateMap, updateFeatures } from '../actions'
+import { updatePosition, updateMap, updateFeatures, updateDisplayMask } from '../actions'
 
 import turf from 'turf'
 import GoogleMap from 'google-map-react'
 
 const poly1 = {
-      "type": "Feature",
+  "type": "Feature",
       "properties": {},
       "geometry": {
         "type": "Polygon",
         "coordinates": [
           [
             [
-              2.3229217529296875,
-              48.8737479930069
+              2.3394012451171875,
+              48.83398957668602
             ],
             [
-              2.3229217529296875,
-              48.897678169122194
+              2.3394012451171875,
+              48.86765074082236
             ],
             [
-              2.3696136474609375,
-              48.897678169122194
+              2.36480712890625,
+              48.86765074082236
             ],
             [
-              2.3696136474609375,
-              48.8737479930069
+              2.36480712890625,
+              48.83398957668602
             ],
             [
-              2.3229217529296875,
-              48.8737479930069
+              2.3394012451171875,
+              48.83398957668602
             ]
           ]
         ]
@@ -45,31 +45,63 @@ const poly1 = {
 }
 
 const poly2 = {
-      "type": "Feature",
+  "type": "Feature",
       "properties": {},
       "geometry": {
         "type": "Polygon",
         "coordinates": [
           [
             [
-              2.3129653930664062,
-              48.86923158125418
+              2.2896194458007812,
+              48.840542852103084
             ],
             [
-              2.3129653930664062,
-              48.902304853438
+              2.2896194458007812,
+              48.86787657822752
             ],
             [
-              2.3788833618164062,
-              48.902304853438
+              2.3311614990234375,
+              48.86787657822752
             ],
             [
-              2.3788833618164062,
-              48.86923158125418
+              2.3311614990234375,
+              48.840542852103084
             ],
             [
-              2.3129653930664062,
-              48.86923158125418
+              2.2896194458007812,
+              48.840542852103084
+            ]
+          ]
+        ]
+      }
+}
+
+const poly3 = {
+"type": "Feature",
+      "properties": {},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.271766662597656,
+              48.85048411561242
+            ],
+            [
+              2.271766662597656,
+              48.857487002645485
+            ],
+            [
+              2.396392822265625,
+              48.857487002645485
+            ],
+            [
+              2.396392822265625,
+              48.85048411561242
+            ],
+            [
+              2.271766662597656,
+              48.85048411561242
             ]
           ]
         ]
@@ -85,12 +117,6 @@ const boundsToString = b => {
 }
 */
 
-const rectangleToString = rect => {
-  return _.reduce(rect.geometry.coordinates[0], (acc, p) => {
-    return acc + p[0] + "," + p[1] + ";"
-  }, "")
-}
-
 const boundsToRectangle = b => {
   return turf.envelope(turf.linestring([
     [b.nw.lng, b.nw.lat],
@@ -98,30 +124,46 @@ const boundsToRectangle = b => {
   ]))
 }
 
-const boundsToString = R.compose (R.dropLast(1), rectangleToString, boundsToRectangle)
+const coordinatesToString = coords => {
+  return R.dropLast(1) (_.reduce(coords, (acc, p) => {
+    return acc + p[0] + "," + p[1] + ";"
+  }, ""))
+}
 
-const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => bounds => {
+const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => screenShape => {
   return baseUrl + "/api/projects/" + projectId
           + "/shapes/geojson?categories=" + categories
-          + "&polyBounds=" + boundsToString(bounds)
+          + "&polyBounds=" + screenShape
           + "&method=" + method
           + "&geoUse=" + geoUse
 })(params.query)
 
-const fetchNewShapes = (map, dispatch, position, currentFeatures) => {
+const fetchNewShapes = (map, dispatch, position, currentFeatures, displayMask) => {
   if (!position.marginBounds || !map) return
+
+  const screenRect = boundsToRectangle(position.marginBounds)
+  dispatch(updateDisplayMask(screenRect))
+  const screenShapes = _.isEmpty(displayMask) ? screenRect : turf.erase(screenRect, displayMask)
+
+  if (!screenShapes) return
+
   console.log("Loading GeoJSON...")
-  fetch(buildUrl(position.marginBounds))
-  .then(res => res.json())
-  .then(collection => {
-    console.log(collection.features.length + " features loaded.");
-    const filteredCollection = {...collection, features: getPolygons(collection)}
-    dispatch(updateFeatures(currentFeatures, filteredCollection, map))
-    console.log("Loaded.")
+
+  screenShapes.geometry.coordinates.forEach(coords => {
+    const url = buildUrl(coordinatesToString((coords.length === 1) ? coords[0] : coords))
+    fetch(url)
+      .then(res => res.json())
+      .then(collection => {
+        console.log(collection.features.length + " features loaded.");
+        const filteredCollection = {...collection, features: getPolygons(collection)}
+        dispatch(updateFeatures(currentFeatures, filteredCollection, map))
+        console.log("Loaded.")
+      })
+      .catch(err => {
+        console.log("ERROR: ", err)
+      })
   })
-  .catch(err => {
-    console.log("ERROR: ", err)
-  })
+
 }
 
 export default connect (MainAppSelector) (({dispatch, position, map, ...props}) => {
@@ -134,18 +176,15 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
 
         onGoogleApiLoaded={({map, maps}) => {
           dispatch(updateMap(map))
-          //map.data.addGeoJson(turf.erase(poly1, poly2))
-          //console.log("HERE: ", turf.erase(poly1, poly2))
-          fetchNewShapes(map, dispatch, position, props.features)
+          fetchNewShapes(map, dispatch, position, props.features, props.displayMask)
         }}
         yesIWantToUseGoogleMapApiInternals
         zoom={position.zoom}
         center={position.center}
         onChange={position => {
-          console.log(JSON.stringify(boundsToRectangle(position.marginBounds)))
 
           dispatch(updatePosition(position))
-          fetchNewShapes(map, dispatch, position, props.features)
+          fetchNewShapes(map, dispatch, position, props.features, props.displayMask)
         }}
       >
       </GoogleMap>
