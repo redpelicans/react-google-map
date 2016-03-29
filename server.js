@@ -11,10 +11,14 @@ import fs from 'fs';
 import mongobless from 'mongobless';
 import { init } from './shape';
 import params from './params';
+import socketIO from 'socket.io';
+import http from 'http'
 
 const isDeveloping = process.env.NODE_ENV !== 'production';
 const port = process.env.PORT ? process.env.PORT : 3004;
 const app = express();
+const server = http.Server(app);
+const io = socketIO(server);
 
 
 console.log("Starting server...")
@@ -62,14 +66,14 @@ console.log("--- Connecting DB...")
 mongobless.connect(params.db, (err) => {
 	if (err) throw err
 	console.log("--- DB Connected")
-	init(app)
+	init(io)
 })
 
 process.on('exit', function() {
 	mongobless.close()
 });
 
-app.listen(port, '0.0.0.0', function onStart(err) {
+server.listen(port, '0.0.0.0', function onStart(err) {
   if (err) {
     console.log(err);
   }

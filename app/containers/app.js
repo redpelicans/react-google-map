@@ -3,6 +3,7 @@ import R from 'ramda'
 import React, { Component } from 'react'
 import { createStore } from 'redux'
 import { connect } from 'react-redux'
+import io from 'socket.io-client'
 
 import params from '../../params'
 
@@ -12,110 +13,10 @@ import { updatePosition, updateMap, updateFeatures, updateDisplayMask } from '..
 import turf from 'turf'
 import GoogleMap from 'google-map-react'
 
-const poly1 = {
-  "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.3394012451171875,
-              48.83398957668602
-            ],
-            [
-              2.3394012451171875,
-              48.86765074082236
-            ],
-            [
-              2.36480712890625,
-              48.86765074082236
-            ],
-            [
-              2.36480712890625,
-              48.83398957668602
-            ],
-            [
-              2.3394012451171875,
-              48.83398957668602
-            ]
-          ]
-        ]
-      }
-}
-
-const poly2 = {
-  "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.2896194458007812,
-              48.840542852103084
-            ],
-            [
-              2.2896194458007812,
-              48.86787657822752
-            ],
-            [
-              2.3311614990234375,
-              48.86787657822752
-            ],
-            [
-              2.3311614990234375,
-              48.840542852103084
-            ],
-            [
-              2.2896194458007812,
-              48.840542852103084
-            ]
-          ]
-        ]
-      }
-}
-
-const poly3 = {
-"type": "Feature",
-      "properties": {},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [
-              2.271766662597656,
-              48.85048411561242
-            ],
-            [
-              2.271766662597656,
-              48.857487002645485
-            ],
-            [
-              2.396392822265625,
-              48.857487002645485
-            ],
-            [
-              2.396392822265625,
-              48.85048411561242
-            ],
-            [
-              2.271766662597656,
-              48.85048411561242
-            ]
-          ]
-        ]
-      }
-}
+let socket = io.connect(params.query.baseUrl)
 
 const getPolygons = features => features.filter(x => x.geometry.type === "Polygon")
 const getPoints = features => features.filter(x => x.geometry.type === "Point")
-
-/*
-const boundsToString = b => {
-  return b.nw.lng + "," + b.nw.lat + ";" + b.se.lng + "," + b.se.lat
-}
-*/
 
 const boundsToRectangle = b => {
   return turf.envelope(turf.linestring([
@@ -138,7 +39,19 @@ const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => screen
           + "&geoUse=" + geoUse
 })(params.query)
 
-const fetchNewShapes = (map, position, currentFeatures, displayMask) => dispatch => {
+const buildReq = (({projectId, categories, method, geoUse}) => screenShape => {
+  return {
+    params: {id: projectId},
+    query: {
+      polyBounds: screenShape,
+      geoUse,
+      method,
+      categories,
+    },
+  }
+})(params.query)
+
+const fetchNewShapes = (map, position, displayMask) => (dispatch, getState) => {
   if (!position.marginBounds || !map) return
 
   const screenRect = boundsToRectangle(position.marginBounds)
@@ -150,28 +63,17 @@ const fetchNewShapes = (map, position, currentFeatures, displayMask) => dispatch
   console.log("Loading GeoJSON...")
 
   screenShapes.geometry.coordinates.forEach(coords => {
-    const url = buildUrl(coordinatesToString((coords.length === 1) ? coords[0] : coords))
-    fetch(url)
-      .then(res => res.json())
-      .then(features => {
-        const filteredFeatures = getPolygons(features)
-        console.log(filteredFeatures.length + " features loaded.");
-        filteredFeatures.forEach((feature, i) => {
-          setTimeout(() => {
-            dispatch(updateFeatures(currentFeatures, feature, map))
-          }, i * 10)
-        })
-        console.log("Loaded.")
-      })
-      .catch(err => {
-        console.log("ERROR: ", err)
-      })
+    const req = buildReq(coordinatesToString((coords.length === 1) ? coords[0] : coords))
+    socket.emit('fetchFeatures', req)
+    socket.on('fetchFeatures', feature => {
+      if (feature.geometry.type === 'Polygon') {
+          dispatch(updateFeatures(getState().features, feature, map))
+      }
+    })
   })
-
 }
 
 export default connect (MainAppSelector) (({dispatch, position, map, ...props}) => {
-  //console.log(Object.keys(props.features).length)
   return (
     <div style={{width: "100vw", height: "100vw"}}>
       <GoogleMap
@@ -181,7 +83,7 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
 
         onGoogleApiLoaded={({map, maps}) => {
           dispatch(updateMap(map))
-          dispatch(fetchNewShapes(map, position, props.features, props.displayMask))
+          dispatch(fetchNewShapes(map, position, props.displayMask))
         }}
         yesIWantToUseGoogleMapApiInternals
         zoom={position.zoom}
@@ -189,7 +91,7 @@ export default connect (MainAppSelector) (({dispatch, position, map, ...props}) 
         onChange={position => {
 
           dispatch(updatePosition(position))
-          dispatch(fetchNewShapes(map, position, props.features, props.displayMask))
+          dispatch(fetchNewShapes(map, position, props.displayMask))
         }}
       >
       </GoogleMap>

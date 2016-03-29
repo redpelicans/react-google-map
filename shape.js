@@ -76,8 +76,16 @@ function geojson(shape, full = false) {
 /******************************************************************************/
 
 
-export function init(app) {
-  app.get('/api/projects/:id/shapes/geojson', getShapesGeoJson);
+export function init(io) {
+  //app.get('/api/projects/:id/shapes/geojson', getShapesGeoJson);
+
+  io.on('connection', socket => {
+    socket.on('fetchFeatures', data => {
+      getShapesFromReq(data, (err, shape) => {
+        socket.emit('fetchFeatures', geojson(shape))
+      })
+    })
+  })
 
   function getShapesFromReq(req, cb) {
     follow('In GetShapesFromReq');
@@ -125,7 +133,7 @@ export function init(app) {
           if(!shapes) return cb(new HTTPError(404, 'No Shape found'));
           follow('Got the Shapes with aggregate method');
           return cb(null, shapes, project.bbox);
-          });
+        });
       } else if(req.query.method == 'bbox') {
           // not implemented
       } else {
@@ -137,25 +145,13 @@ export function init(app) {
         //if(geoQuery) stdQuery.$query.$and.push(geoQuery);
         _.extend(stdQuery, geoQuery)
 
-/*
-        Shape.findAll(stdQuery, fieldsLimit , (err, shapes) => {
-            if(err) return cb(err);
-            if(!shapes) return cb(new HTTPError(404, 'No Shape found'));
-            follow('Got the Shapes with normal query method');
-            return cb(null, shapes, project.bbox);
-        });
-  */
 
-
-        let shapes = [];
         let cursor = Shape.collection.find(stdQuery).project({ _id: 1, geometry: 1, geoIndex: 1, categories: 1, labels: 1 });
         cursor.on('data', shape => {
-          if(!shapes.length) follow('Got the first shapes')
-          shapes.push(shape)
+          cb(null, shape)
         })
         cursor.on('end', () => {
           follow('Got the Shapes with normal query method')
-          return cb(null, shapes, project.bbox)
         })
 
       }
@@ -277,18 +273,4 @@ export function init(app) {
 
   }
 
-  function getShapesGeoJson(req, res, next) {
-
-    let t0 = new Date()
-    let full = false;
-    if(req.query.full == '1') full = true;
-
-      getShapesFromReq(req, (err, shapes, bbox) => {
-          if(err) return next(err);
-          t0 = new Date()
-          //const xx = JSON.stringify(geojsonList(shapes, bbox, full))
-          //res.json(out.geojsonList(shapes, bbox, full));
-          res.send(JSON.stringify(_.map(shapes, (shape) => geojson(shape, full))))
-      });
-  }
 }
