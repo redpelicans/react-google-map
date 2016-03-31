@@ -82,7 +82,10 @@ export function init(io) {
   io.on('connection', socket => {
     socket.on('fetchFeatures', data => {
       getShapesFromReq(data, (err, shape) => {
-        socket.emit('fetchFeatures', geojson(shape))
+        if (shape === "end")
+          socket.send("fetchFeatures done.")
+        else
+          socket.emit('fetchFeatures', geojson(shape))
       })
     })
   })
@@ -152,6 +155,7 @@ export function init(io) {
         })
         cursor.on('end', () => {
           follow('Got the Shapes with normal query method')
+          cb(null, "end")
         })
 
       }

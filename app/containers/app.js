@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import R from 'ramda'
+import flyd from 'flyd'
 import React, { Component } from 'react'
 import { createStore } from 'redux'
 import { connect } from 'react-redux'
@@ -15,9 +16,40 @@ import GoogleMap from 'google-map-react'
 
 let socket = io.connect(params.query.baseUrl)
 
-const getPolygons = features => features.filter(x => x.geometry.type === "Polygon")
-const getPoints = features => features.filter(x => x.geometry.type === "Point")
 
+
+
+///////// FRP UTILS ///////////////////
+const every = (dur = 100) => {
+  const s = flyd.stream()
+  const timer = (first = false) => {
+    if (s.end()) return
+    const t = dur
+    if (!first) s(t)
+    setTimeout(timer, t)
+  }
+  timer(true)
+  return s
+}
+
+const cacheUntil = trigger => stream => {
+  let acc = []
+  const cache = flyd.stream()
+
+  flyd.on(x => acc.push(x), stream)
+
+  return flyd.combine(() => {
+    const newAcc = acc
+    acc = []
+    return newAcc.length ? newAcc : undefined
+  }, [trigger])
+}
+//////////////////////////////
+
+
+
+
+//////////// GEO UTILS //////////////////
 const boundsToRectangle = b => {
   return turf.envelope(turf.linestring([
     [b.nw.lng, b.nw.lat],
@@ -31,13 +63,6 @@ const coordinatesToString = coords => {
   }, ""))
 }
 
-const buildUrl = (({ baseUrl, projectId, categories, method, geoUse }) => screenShape => {
-  return baseUrl + "/api/projects/" + projectId
-          + "/shapes/geojson?categories=" + categories
-          + "&polyBounds=" + screenShape
-          + "&method=" + method
-          + "&geoUse=" + geoUse
-})(params.query)
 
 const buildReq = (({projectId, categories, method, geoUse}) => screenShape => {
   return {
@@ -50,7 +75,11 @@ const buildReq = (({projectId, categories, method, geoUse}) => screenShape => {
     },
   }
 })(params.query)
+//////////////////////////////
 
+
+
+let displayedFeatures = {}
 const fetchNewShapes = (map, position, displayMask) => (dispatch, getState) => {
   if (!position.marginBounds || !map) return
 
@@ -60,17 +89,26 @@ const fetchNewShapes = (map, position, displayMask) => (dispatch, getState) => {
 
   if (!screenShapes) return
 
-  console.log("Loading GeoJSON...")
+  const streamFeatures = flyd.stream()
+  const filter = flyd.combine((s) => {
+    if (displayedFeatures[s().properties.id]) return undefined
+    displayedFeatures[s().properties.id] = true
+    return s()
+  }, [streamFeatures])
+
+  const cache = cacheUntil (every(100)) (filter)
+
+  flyd.on((features) => {
+    map.data.addGeoJson({type: "FeatureCollection", features})
+  }, cache)
 
   screenShapes.geometry.coordinates.forEach(coords => {
     const req = buildReq(coordinatesToString((coords.length === 1) ? coords[0] : coords))
     socket.emit('fetchFeatures', req)
-    socket.on('fetchFeatures', feature => {
-      if (feature.geometry.type === 'Polygon') {
-          dispatch(updateFeatures(getState().features, feature, map))
-      }
-    })
+    socket.on('message', x => console.log(x))
+    socket.on('fetchFeatures', streamFeatures)
   })
+  console.log("Loading GeoJSON...")
 }
 
 export default connect (MainAppSelector) (({dispatch, position, map, ...props}) => {
